@@ -12,30 +12,37 @@
 輸出 JSON 格式
 
     {
-        "article_id": 文章 ID,
-        "article_title": 文章標題 ,
-        "author": 作者,
-        "board": 板名,
-        "content": 文章內容,
-        "date": 發文時間,
-        "ip": 發文位址,
-        "message_conut": { # 推文
-            "all": 總數,
-            "boo": 噓文數,
-            "count": 推文數-噓文數,
-            "neutral": → 數,
-            "push": 推文數
-        },
-        "messages": [ # 推文內容
-            {
-                "push_content": 推文內容,
-                "push_ipdatetime": 推文時間及位址,
-                "push_tag": 推/噓/→ ,
-                "push_userid": 推文者 ID
+            "article_id": "M.1263537261.A.EA5",
+            "article_title": "[心得] 通識/556/台灣紀錄片賞析/紀文章",
+            "author": "twfir (台灣杉)",
+            "board": "NCHU-Courses",
+            "content": {
+                "class_t": "556",
+                "dept": "新制通識 可採計舊制歷史",
+                "enrol_seme": "981",
+                "feeling": "點名是傳張紙點名 報告寫的是上課影片的觀後感 很輕鬆\n\n             播放的紀錄片都很有內容 也有國外的片子\n\n             就通識而言 這可能是最輕鬆的一門 看看電影就有學分 收穫也很大",
+                "history_record": "",
+                "judge": "出席期中期末報告(1000字的影片觀後感",
+                "note": "搶很兇 高年級才有機會加簽(4>3>>>>>2)\n            上課跟看電影一樣 請挑個好位子 不要被擋到",
+                "prof": "紀文章",
+                "textbook": "在綜大1樓的視聽教室播放紀錄片\n                           時間允許的話 會在片後作講解 不用課本或筆記"
             },
-            ...
-        ]
-    }
+            "date": "Fri Jan 15 14:34:19 2010",
+            "ip": "None",
+            "message_conut": {
+                "all": 1,
+                "boo": 0,
+                "count": 1,
+                "neutral": 0,
+                "push": 1
+            },
+            "messages": [{
+                "push_content": "好課！",
+                "push_ipdatetime": "125.226.24.88 02/01 23:15",
+                "push_tag": "推",
+                "push_userid": "bpbpbp"
+            }]
+        }
 
 ### 執行方式
     python crawler.py -b 看板名稱 -i 起始索引 結束索引 

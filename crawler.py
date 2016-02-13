@@ -19,7 +19,20 @@ VERIFY = True
 if sys.version_info[0] < 3:
     VERIFY = False
     requests.packages.urllib3.disable_warnings()
+#全域字典，中文轉英文
 
+chi2en = {
+    '修業學年度/學期':'enrol_seme',
+    '上課時段':'class_t',
+    '課程名稱/授課教師':'prof',
+    '所屬類別/開課系所':'dept',
+    '上課方式/用書':'textbook',
+    '評分方式':'judge',
+    '注意事項':'note',
+    '心得/結語':'feeling',
+    '成績參考':'history_record',
+
+}
 
 def crawler(cmdline=None):
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, description='''
@@ -181,12 +194,12 @@ def parse_content(filtered):
     key = ['修業學年度/學期','上課時段','課程名稱/授課教師','所屬類別/開課系所','上課方式/用書','評分方式','注意事項','心得/結語','成績參考']
     start_index=end_index=1#initialization
     content_dict = {}
-    truncate_head(filtered,key)    
+    truncate_head(filtered,key)#把前面多餘的字砍掉 
     for i in enumerate(key):       
         string = ""               
         for j in enumerate(filtered):
             if i[0] < len(key)-1:
-                #general situation
+                #general situation,因為下面的判斷式會用到i[0]+1,如果已經是最後一個還這麼做就index out of range
                 if j[1] == key[i[0]+1]:
                     #end_index是for要停下來的位置，因為end_index是下一個key的位置              
                     end_index = j[0]
@@ -198,12 +211,13 @@ def parse_content(filtered):
                     break
 
         key_i = []
-        key_i.append(filtered[start_index-1])#拿到key
+        eng_key = convert_key(filtered[start_index-1])
+        key_i.append(eng_key)#拿到key
         start_index,string = concatenate(start_index,end_index,filtered,string)
                        
         string_l = []
         string_l.append(string)
-        row = zip(key_i,string_l)
+        row = zip(key_i,string_l)#two argument of zip can only be iterable, so 'list, tuple etc' is suitable!!!
         content_dict.update(row)        
     return content_dict
 
@@ -218,6 +232,9 @@ def truncate_head(filtered,key):
     while filtered[0] != key[0]:
         filtered.pop(0)
         #把不是修業學年度開頭的文字去掉，讓filtered都固定從同樣的key開始遞迴
+
+def convert_key(key):
+    return chi2en[key]#it will return it's eng key.
 
 if __name__ == '__main__':
     crawler()
