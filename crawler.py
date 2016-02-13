@@ -93,6 +93,9 @@ def parse(link, article_id, board):
     if metas:
         author = metas[0].select('span.article-meta-value')[0].string if metas[0].select('span.article-meta-value')[0] else author
         title = metas[1].select('span.article-meta-value')[0].string if metas[1].select('span.article-meta-value')[0] else title
+        if '[心得]' not in title:return#因為我們只要課程新的的文，所以就只篩選心得、RE開頭的標題
+
+
         date = metas[2].select('span.article-meta-value')[0].string if metas[2].select('span.article-meta-value')[0] else date
 
         # remove meta nodes
@@ -121,8 +124,10 @@ def parse(link, article_id, board):
     
     filtered = [_f for _f in filtered if _f]  # remove empty strings
     filtered = [x for x in filtered if article_id not in x]  # remove last line containing the url of the article
-    content = ' '.join(filtered)
-    content = re.sub(r'(\s)+', ' ', content)
+
+    content = parse_content(filtered)  
+    # content = ' '.join(filtered)
+    # content = re.sub(r'(\s)+', ' ', content)
     # print 'content', content
 
     # push messages
@@ -170,6 +175,49 @@ def parse(link, article_id, board):
 def store(filename, data, mode):
     with codecs.open(filename, mode, encoding='utf-8') as f:
         f.write(data)
+
+def parse_content(filtered):
+    #filterd是陣列型態的本文資料
+    key = ['修業學年度/學期','上課時段','課程名稱/授課教師','所屬類別/開課系所','上課方式/用書','評分方式','注意事項','心得/結語','成績參考']
+    start_index=end_index=1#initialization
+    content_dict = {}
+    truncate_head(filtered,key)    
+    for i in enumerate(key):       
+        string = ""               
+        for j in enumerate(filtered):
+            if i[0] < len(key)-1:
+                #general situation
+                if j[1] == key[i[0]+1]:
+                    #end_index是for要停下來的位置，因為end_index是下一個key的位置              
+                    end_index = j[0]
+                    break
+            else:
+                #this is final iteration
+                if j[1] == key[i[0]]:                    
+                    end_index = len(filtered)-1
+                    break
+
+        key_i = []
+        key_i.append(filtered[start_index-1])#拿到key
+        start_index,string = concatenate(start_index,end_index,filtered,string)
+                       
+        string_l = []
+        string_l.append(string)
+        row = zip(key_i,string_l)
+        content_dict.update(row)        
+    return content_dict
+
+def concatenate(start_index,end_index,filtered,string):
+    for i in enumerate(filtered):
+        if i[0] == end_index:
+            return (i[0]+1,string)
+        elif i[0] >= start_index and i[0] < end_index:
+            string += i[1]#i[1] is string, i[0] is index
+
+def truncate_head(filtered,key):
+    while filtered[0] != key[0]:
+        filtered.pop(0)
+        #把不是修業學年度開頭的文字去掉，讓filtered都固定從同樣的key開始遞迴
 
 if __name__ == '__main__':
     crawler()
