@@ -42,7 +42,7 @@
                 "push_tag": "推",
                 "push_userid": "bpbpbp"
             }]
-        }
+    }
 
 ### 執行方式
     python crawler.py -b 看板名稱 -i 起始索引 結束索引 
