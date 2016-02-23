@@ -31,7 +31,8 @@ chi2en = {
     '注意事項':'note',
     '心得/結語':'feeling',
     '成績參考':'history_record',
-
+    '引述':'quote',
+    '回應':'response',
 }
 
 def crawler(cmdline=None):
@@ -77,19 +78,38 @@ def crawler(cmdline=None):
                     link = PTT_URL + href
                     article_id = re.sub('\.html', '', href.split('/')[-1])
                     if div == divs[-1] and i == end-start:  # last div of last page
-                        store(filename, parse(link, article_id, board) + '\n', 'a')
+                        parse_result=parse(link, article_id, board)
+                        if parse_result=="title_false":
+                            pass
+                        else:
+                            store(filename, parse(link, article_id, board) + '\n', 'a')
                     else:
-                        store(filename, parse(link, article_id, board) + ',\n', 'a')
+                        parse_result=parse(link, article_id, board)
+                        if parse_result=="title_false":
+                            pass
+                        else:
+                            store(filename, parse(link, article_id, board) + ',\n', 'a')
                 except:
+                    #記錄例外情形
+                    except_case.append(article_id)
+                    global except_case_num
+                    except_case_num+=1
                     pass
             time.sleep(0.1)
+                   
         store(filename, u']}', 'a')
     else:  # args.a
-        article_id = args.a
-        link = PTT_URL + '/bbs/' + board + '/' + article_id + '.html'
-        filename = board + '-' + article_id + '.json'
-        store(filename, parse(link, article_id, board), 'w')
-
+        try:
+            article_id = args.a
+            link = PTT_URL + '/bbs/' + board + '/' + article_id + '.html'
+            filename = board + '-' + article_id + '.json'
+            store(filename, parse(link, article_id, board), 'w')
+        except:
+            #記錄例外情形
+            except_case.append(article_id)
+            global except_case_num
+            except_case_num+=1
+            pass
 
 def parse(link, article_id, board):
     print('Processing article:', article_id)
@@ -98,6 +118,9 @@ def parse(link, article_id, board):
         print('invalid url:', resp.url)
         return json.dumps({"error": "invalid url"}, indent=4, sort_keys=True, ensure_ascii=False)
     soup = BeautifulSoup(resp.text)
+
+    pre_description=find_pre_description(soup)
+
     main_content = soup.find(id="main-content")
     metas = main_content.select('div.article-metaline')
     author = ''
@@ -106,9 +129,8 @@ def parse(link, article_id, board):
     if metas:
         author = metas[0].select('span.article-meta-value')[0].string if metas[0].select('span.article-meta-value')[0] else author
         title = metas[1].select('span.article-meta-value')[0].string if metas[1].select('span.article-meta-value')[0] else title
-        if '[心得]' not in title:return#因為我們只要課程新的的文，所以就只篩選心得、RE開頭的標題
-
-
+        if '[心得]' not in title and 'Re' not in title:return "title_false"
+        #因為我們只要課程新的的文，所以就只篩選心得、RE開頭的標題
         date = metas[2].select('span.article-meta-value')[0].string if metas[2].select('span.article-meta-value')[0] else date
 
         # remove meta nodes
@@ -116,6 +138,11 @@ def parse(link, article_id, board):
             meta.extract()
         for meta in main_content.select('div.article-metaline-right'):
             meta.extract()
+
+    #確定是哪一種貼文
+    mod=0
+    if 'Re' in title:
+        mod=1
 
     # remove and keep push nodes
     pushes = main_content.find_all('div', class_='push')
@@ -138,10 +165,14 @@ def parse(link, article_id, board):
     filtered = [_f for _f in filtered if _f]  # remove empty strings
     filtered = [x for x in filtered if article_id not in x]  # remove last line containing the url of the article
 
-    content = parse_content(filtered)  
-    # content = ' '.join(filtered)
-    # content = re.sub(r'(\s)+', ' ', content)
-    # print 'content', content
+    #mod=0為[心得],mod=1為Re
+    if mod==0:
+        content = parse_content(filtered)  
+    else:
+        content = parse_re_content(filtered,pre_description)
+    #content = ' '.join(filtered)
+    #content = re.sub(r'(\s)+', ' ', content)
+    #print('content', content)
 
     # push messages
     p, b, n = 0, 0, 0
@@ -191,9 +222,10 @@ def store(filename, data, mode):
 
 def parse_content(filtered):
     #filterd是陣列型態的本文資料
-    key = ['修業學年度/學期','上課時段','課程名稱/授課教師','所屬類別/開課系所','上課方式/用書','評分方式','注意事項','心得/結語','成績參考']
+    key = ['修業學年度/學期','上課時段','課程名稱/授課教師','所屬類別/開課系所','上課方式/用書','評分方式','注意事項','心得/結語','成績參考','引述','回應']
     start_index=end_index=1#initialization
     content_dict = {}
+    key_split(filtered,key)
     truncate_head(filtered,key)#把前面多餘的字砍掉 
     for i in enumerate(key):       
         string = ""               
@@ -209,16 +241,18 @@ def parse_content(filtered):
                 if j[1] == key[i[0]]:                    
                     end_index = len(filtered)-1
                     break
-
         key_i = []
         eng_key = convert_key(filtered[start_index-1])
         key_i.append(eng_key)#拿到key
-        start_index,string = concatenate(start_index,end_index,filtered,string)
-                       
+        start_index,string = concatenate(start_index,end_index,filtered,string)       
         string_l = []
         string_l.append(string)
-        row = zip(key_i,string_l)#two argument of zip can only be iterable, so 'list, tuple etc' is suitable!!!
-        content_dict.update(row)        
+        #將"引述"和"回應"
+        if i[0]==9 or i[0]==10:
+            row=zip([convert_key(i[1])],[''])
+        else:
+            row = zip(key_i,string_l)#two argument of zip can only be iterable, so 'list, tuple etc' is suitable!!!
+        content_dict.update(row)    
     return content_dict
 
 def concatenate(start_index,end_index,filtered,string):
@@ -230,11 +264,85 @@ def concatenate(start_index,end_index,filtered,string):
 
 def truncate_head(filtered,key):
     while filtered[0] != key[0]:
+        string=filtered[0]
+        #將與key[0]連在一起的字串切開
+        for i in enumerate(string):
+            if string[:i[0]]==key[0]:
+                filtered.pop(0)
+                filtered.insert(0,string[i[0]+1:])
+                filtered.insert(0,string[:i[0]])
+                return
         filtered.pop(0)
         #把不是修業學年度開頭的文字去掉，讓filtered都固定從同樣的key開始遞迴
+
+#將與key連在一起的字串切開
+def key_split(filtered,key):
+    key_j=0
+    for item in enumerate(filtered):
+        string=item[1]
+        for i in enumerate(string):
+            if string[:i[0]]==key[key_j]:
+                filtered.pop(item[0])
+                filtered.insert(item[0],string[i[0]+1:])
+                filtered.insert(item[0],string[:i[0]])
+                key_j+=1
+                break;
+
 
 def convert_key(key):
     return chi2en[key]#it will return it's eng key.
 
+def parse_re_content(filtered,pre_description):
+    response=find_response(filtered,pre_description)
+    all_pre_description_content=""
+    for str1 in pre_description:
+        if str1[0]==":":
+            str1=str1[2:]
+        all_pre_description_content+=str1
+    main_contain=['','','','','','','','','']+[all_pre_description_content,response]
+    content=json_type(main_contain)
+    return content
+
+#抓引述內容
+def find_pre_description(soup):
+    pre_descriptions=[]
+    for line in soup.select('.f6'):
+        line.extract()
+        pre_descriptions.append(line.text)
+    return pre_descriptions
+
+#抓回應 比對引述 將不是引述的內容(回應)存起來
+def find_response(filtered,pre_description):
+    response=""
+    for item in filtered:
+        target=0
+        for key in pre_description:
+            if item==key :
+                target=1
+                break
+        if target==0:
+            response+=item
+    return response
+
+def json_type(main_contain):
+    key = ['修業學年度/學期','上課時段','課程名稱/授課教師','所屬類別/開課系所','上課方式/用書','評分方式','注意事項','心得/結語','成績參考','引述','回應']
+    content_dict={}
+    all_key=[]
+    for i in key:
+        all_key.append(chi2en[i])
+    row=zip(all_key,main_contain)
+    content_dict.update(row) 
+    return content_dict
+
+def except_data_store(except_case,except_case_num):
+    store("except_case.json", json.dumps({"except_case_num": except_case_num,"except_case":except_case}, indent=4, sort_keys=True, ensure_ascii=False)+'\n','a')
+
+except_case=[]
+except_case_num=0
 if __name__ == '__main__':
     crawler()
+    except_data_store(except_case,except_case_num)
+    print(except_case_num,except_case)
+
+    
+
